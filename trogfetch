@@ -13,18 +13,18 @@ g=$(($d/1000000))
 h=$(($g*1024)) #total swap in GiB
 i=$(($f-$h))
 
-echo
-echo "---- General ----"
-echo -e 'Distro\t| ' $(grep -w 'PRETTY_NAME=' /etc/os-release | cut -c13- | tr -d '""' )
-echo -e 'Kernal\t| ' $(uname -rs)
-echo -e 'Uptime\t| ' $(uptime -p | cut -c3-)
-echo -ne 'Mobo\t| ' $(cat /sys/devices/virtual/dmi/id/board_{vendor,name,version})
-echo
-echo -e "\n---- CPU ----"
-echo -e 'Model\t| ' $(lscpu | grep -w "Model name:" | cut -c12-)
-echo -e 'Speed\t| ' $(lscpu | grep -w "CPU max MHz" | cut -c13-)
-echo -e 'Cores\t| ' $b
-echo -e 'Threads\t| ' "$(($a*$b))" 
+
+printf "---- General ----"
+printf "Distro\t| %s\n " "$(grep -w 'PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')"
+printf "Kernel\t| %s\n" "$(uname -rs)"
+printf "Uptime\t| %s\n" "$(uptime -p | xargs)"
+printf "Mobo\t| %s\n" "$(cat /sys/devices/virtual/dmi/id/board_{vendor,name,version} | xargs)"
+
+printf "\n---- CPU ----"
+printf "Model\t| %s\n" "$(lscpu | grep -w "Model name:" | cut -c13- | xargs)"
+printf "Speed\t| %s\n" "$(lscpu | grep -w "CPU max MHz" | cut -c14- | xargs)"
+printf "Cores\t| %s\n"  "$b"
+printf 'Threads\t| %s\n' "$(($a*$b))" 
 echo
 echo "---- GPU ----"
 echo -e 'GPU\t| ' $(lspci -m | grep 'VGA' | cut -d '"' -f6)
