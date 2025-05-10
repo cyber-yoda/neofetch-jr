@@ -1,34 +1,52 @@
 #!/usr/bin/env bash
 
-a=$(lscpu | awk -F '/Thread\(s\) per core/ { print $2 }' | xargs )
-b=$(lscpu | awk -F '/Core\(s\) per socket/ { print $2 }' | xargs )
+# Refactored from piping lscpu into grep piped into cut -c20- to using awk instead
+a=$(lscpu | awk -F: '/Thread\(s\) per core/ { print $2 }' | xargs)
+b=$(lscpu | awk -F: '/Core\(s\) per socket/ { print $2}' | xargs)
 
-c=$(awk '/MemTotal:/ {print $2}' /proc/meminfo) # in KiB
-d=$(awk '/SwapTotal:/ {print $2}' /proc/meminfo) # in KiB
+# Refactored to use awk for text processing and mathematical ops
+c=$(awk '/MemTotal:/ { print $2 }' /proc/meminfo) # total memory in KiB
+d=$(awk '/SwapTotal:/ { print $2 }' /proc/meminfo) # total swap in KiB
+e=$(awk "BEGIN {print $c / 1000000}")
+f=$(awk "BEGIN {print $e * 1024}") # total ram in MiB (including swap??)
 
-e=$(($c/1000000))
-f=$(($e*1024)) # total ram in GiB (including swap??)
+# Refactored to use awk for mathematical ops
+g=$(awk "BEGIN {print $d / 1000000}")
+h=$(awk "BEGIN {$g * 1024}") # total swap in MiB
+i=$(awk -v f="$f" -v h="$h" 'BEGIN {print f - h}')
 
-g=$(($d/1000000))
-h=$(($g*1024)) #total swap in GiB
-i=$(($f-$h))
+# Converted segments into functions
+general() {
+	printf "\n==================== General ====================\n"
+	printf "Distro\t| %s\n" "$(awk -F= '/^PRETTY_NAME=/{gsub(/"/, "", $2); print $2}' /etc/os-release | xargs)"
+	printf 'Kernel\t| %s\n' "$(uname -rs | xargs)"
+	printf 'Uptime\t| %s\n' "$(uptime -p | sed 's/^..//' | xargs)"
+	printf "Mobo\t| %s\n" "$(cat /sys/devices/virtual/dmi/id/board_{vendor,name,version} | xargs)"
+}
+processor() {
+	printf "\n==================== CPU ====================\n"
+	printf "Model\t| %s\n" "$(lscpu | grep -w "Model name:" | cut -c13- | xargs)"
+	printf "Speed\t| %s MHz\n" "$(lscpu | grep -w "CPU max MHz" | cut -c14- | xargs)"
+	printf "Cores\t| %s\n" "$b"
+	printf "Threads\t| %s\n" "$a"
+}
+graphics_proc() {
+	printf "\n==================== GPU ====================\n"
+	printf "GPU\t| %s\n" "$(lspci -m | awk -F'"' '/VGA/ { printf "%s %s", $4, "Codename " $6 }' | xargs)"
+}
 
-echo
-echo "---- General ----"
-echo -e 'Distro\t| ' $(grep -w 'PRETTY_NAME=' /etc/os-release | cut -c13- | tr -d '""' )
-echo -e 'Kernal\t| ' $(uname -rs)
-echo -e 'Uptime\t| ' $(uptime -p | cut -c3-)
-echo -ne 'Mobo\t| ' $(cat /sys/devices/virtual/dmi/id/board_{vendor,name,version})
-echo
-echo -e "\n---- CPU ----"
-echo -e 'Model\t| ' $(lscpu | grep -w "Model name:" | cut -c12-)
-echo -e 'Speed\t| ' $(lscpu | grep -w "CPU max MHz" | cut -c13-)
-echo -e 'Cores\t| ' $b
-echo -e 'Threads\t| ' "$(($a*$b))" 
-echo
-echo "---- GPU ----"
-echo -e 'GPU\t| ' $(lspci -m | grep 'VGA' | cut -d '"' -f6)
-echo
-echo "---- RAM ----"
-echo -e 'Memory\t| ' $(($f/1000))" GiB"
-echo -e 'Swap\t| ' $(($h/1000))" GiB" 
+memory() {
+	printf "\n==================== RAM ====================\n"
+	printf "Memory\t| %s KiB\n" "$(awk '{print $1 / 1000}' <<< "$f" | xargs)"
+	printf "Swap\t| %s KiB\n" "$(awk '{print $1 / 1000}' <<< "$h" | xargs)"
+}
+
+# Calls previous functions for General, CPU, GPU, and Memory info (will add Network and Host in future)
+master() {
+	general
+	processor
+	graphics_proc
+	memory
+}
+
+master
