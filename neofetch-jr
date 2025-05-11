@@ -41,12 +41,50 @@ memory() {
 	printf "Swap\t| %s KiB\n" "$(awk '{print $1 / 1000}' <<< "$h" | xargs)"
 }
 
+networking() {
+	printf "\n================== Network ====================\n"
+	printf "Gateway:\t|\t %-18s\n" "$(ip route | awk '/default/ {print $3}')"
+	printf "Public IP:\t|\t %-18s\n" "$(curl -s ifconfig.me || printf "%s\n" 'UNAVAILABLE')"
+	printf "\n"
+	ip -brief a | awk '
+	{
+		iface = $1
+		state = $2
+		ip = ($3 == "") ? "n/A" : $3;
+		printf "Interface: %-10s | IP: %18s | State: %s\n", iface, ip, state
+	}'
+}
+
+security() {
+	printf "\n================== Security ====================\n"
+	printf " Logged In Users\t| %s\n" "$(who | wc -l)"
+}
+
+open_ports() {
+    printf "\n=============== Open Ports & Services ==============\n"
+    ss -tuln | awk '
+        BEGIN { printf "%-8s | %-6s | %s\n", "Protocol", "Port", "Service"; print "----------------------------------------" }
+        NR>1 && $5 ~ /:[0-9]+$/ {
+            split($5, addr, ":");
+            port = addr[length(addr)];
+            cmd = "getent services " port " | awk \047{print $1}\047";
+            cmd | getline svc;
+            close(cmd);
+            printf "%-8s | %-6s | %s\n", $1, port, (svc != "" ? svc : "unknown");
+        }
+    '
+}
+
+
 # Calls previous functions for General, CPU, GPU, and Memory info (will add Network and Host in future)
 master() {
 	general
 	processor
 	graphics_proc
 	memory
+	networking
+	security
+	open_ports
 }
 
 master
